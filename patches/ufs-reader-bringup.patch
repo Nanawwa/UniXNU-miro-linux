@@ -1,0 +1,186 @@
+diff --git a/drivers/phy/qualcomm/phy-qcom-qmp-ufs.c b/drivers/phy/qualcomm/phy-qcom-qmp-ufs.c
+index 0f4ad24aa..5874f360e 100644
+--- a/drivers/phy/qualcomm/phy-qcom-qmp-ufs.c
++++ b/drivers/phy/qualcomm/phy-qcom-qmp-ufs.c
+@@ -1935,9 +1935,16 @@ static int qmp_ufs_power_on(struct phy *phy)
+ 		return ret;
+ 	}
+ 
+-	ret = clk_bulk_prepare_enable(qmp->num_clks, qmp->clks);
+-	if (ret)
+-		goto err_disable_regulators;
++	pr_info("PHYDBG: clk enable start\n");
++	{ int _i;
++	  for (_i = 0; _i < qmp->num_clks; _i++) {
++		pr_info("PHYDBG: enabling clk[%d] %s\n", _i,
++			qmp->clks[_i].id ? qmp->clks[_i].id : "?");
++		ret = clk_prepare_enable(qmp->clks[_i].clk);
++		if (ret) { pr_info("PHYDBG: clk[%d] failed %d\n", _i, ret); goto err_disable_regulators; }
++		pr_info("PHYDBG: clk[%d] ok\n", _i);
++	  }
++	  ret = 0; }
+ 
+ 	qphy_setbits(pcs, cfg->regs[QPHY_PCS_POWER_DOWN_CONTROL], SW_PWRDN);
+ 	return 0;
+@@ -1962,6 +1969,7 @@ static int qmp_ufs_phy_calibrate(struct phy *phy)
+ 
+ 	qmp_ufs_init_registers(qmp, cfg);
+ 
++	pr_info("PHYDBG: reset deassert start\n");
+ 	ret = reset_control_deassert(qmp->ufs_reset);
+ 	if (ret)
+ 		return ret;
+@@ -1974,6 +1982,7 @@ static int qmp_ufs_phy_calibrate(struct phy *phy)
+ 	qphy_setbits(pcs, cfg->regs[QPHY_START_CTRL], SERDES_START);
+ 
+ 	status = pcs + cfg->regs[QPHY_PCS_READY_STATUS];
++	pr_info("PHYDBG: pcs ready poll start\n");
+ 	ret = readl_poll_timeout(status, val, (val & PCS_READY), 200,
+ 				 PHY_INIT_COMPLETE_TIMEOUT);
+ 	if (ret) {
+diff --git a/drivers/ufs/host/ufs-qcom.c b/drivers/ufs/host/ufs-qcom.c
+index 291c43448..61ce891e3 100644
+--- a/drivers/ufs/host/ufs-qcom.c
++++ b/drivers/ufs/host/ufs-qcom.c
+@@ -176,6 +176,11 @@ static int ufs_qcom_ice_init(struct ufs_qcom_host *host)
+ 	int err;
+ 	int i;
+ 
++	/* bring-up: the ICE/HWKM crypto block hangs this platform during probe
++	 * and is not needed to read raw partitions, so skip it entirely. */
++	dev_warn(dev, "UFSDBG: ICE init skipped");
++	return 0;
++
+ 	ice = devm_of_qcom_ice_get(dev);
+ 	if (IS_ERR(ice)) {
+ 		if (ice != ERR_PTR(-EOPNOTSUPP))
+@@ -715,6 +720,7 @@ static void ufs_qcom_link_startup_post_change(struct ufs_hba *hba)
+ static int ufs_qcom_link_startup_notify(struct ufs_hba *hba,
+ 					enum ufs_notify_change_status status)
+ {
++	pr_info("UFSDBG: link_startup_notify\n");
+ 	int err = 0;
+ 
+ 	switch (status) {
+@@ -1429,6 +1435,7 @@ static void ufs_qcom_set_caps(struct ufs_hba *hba)
+ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on,
+ 				 enum ufs_notify_change_status status)
+ {
++	pr_info("UFSDBG: setup_clocks on=%d\n", on);
+ 	struct ufs_qcom_host *host = ufshcd_get_variant(hba);
+ 	struct phy *phy;
+ 	int err;
+@@ -1446,7 +1453,7 @@ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on,
+ 	switch (status) {
+ 	case PRE_CHANGE:
+ 		if (on) {
+-			ufs_qcom_icc_update_bw(host);
++			pr_info("UFSDBG: icc_update_bw skipped\n");
+ 			if (ufs_qcom_is_link_hibern8(hba)) {
+ 				err = ufs_qcom_enable_lane_clks(host);
+ 				if (err) {
+@@ -1469,12 +1476,14 @@ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on,
+ 		break;
+ 	case POST_CHANGE:
+ 		if (on) {
++			pr_info("UFSDBG: phy_power_on start\n");
+ 			err = phy_power_on(phy);
+ 			if (err) {
+ 				dev_err(hba->dev, "phy power on failed, ret = %d\n", err);
+ 				return err;
+ 			}
+ 
++			pr_info("UFSDBG: phy_power_on done\n");
+ 			/* enable the device ref clock for HS mode*/
+ 			if (ufshcd_is_hs_mode(&hba->pwr_info))
+ 				ufs_qcom_dev_ref_clk_ctrl(host, true);
+@@ -1482,8 +1491,7 @@ static int ufs_qcom_setup_clocks(struct ufs_hba *hba, bool on,
+ 			if (ufs_qcom_is_link_hibern8(hba))
+ 				ufs_qcom_disable_lane_clks(host);
+ 
+-			ufs_qcom_icc_set_bw(host, ufs_qcom_bw_table[MODE_MIN][0][0].mem_bw,
+-					    ufs_qcom_bw_table[MODE_MIN][0][0].cfg_bw);
++			pr_info("UFSDBG: icc_set_bw skipped\n");
+ 		}
+ 		break;
+ 	}
+@@ -1562,6 +1570,7 @@ static int ufs_qcom_icc_init(struct ufs_qcom_host *host)
+  */
+ static int ufs_qcom_init(struct ufs_hba *hba)
+ {
++	pr_info("UFSDBG: variant init entry\n");
+ 	int err;
+ 	struct device *dev = hba->dev;
+ 	struct ufs_qcom_host *host;
+@@ -1601,18 +1610,32 @@ static int ufs_qcom_init(struct ufs_hba *hba)
+ 		}
+ 	}
+ 
++	pr_info("UFSDBG: icc start\n");
+ 	err = ufs_qcom_icc_init(host);
+ 	if (err)
+ 		goto out_variant_clear;
++	pr_info("UFSDBG: icc ok\n");
+ 
+ 	host->device_reset = devm_gpiod_get_optional(dev, "reset",
+ 						     GPIOD_OUT_HIGH);
+ 	if (IS_ERR(host->device_reset)) {
+-		err = dev_err_probe(dev, PTR_ERR(host->device_reset),
+-				    "Failed to acquire device reset gpio\n");
+-		goto out_variant_clear;
++		/*
++		 * Vendor DTs hang this optional reset line off a TLMM node that no
++		 * mainline pinctrl driver can bind, so the GPIO never resolves.
++		 * The bootloader already brought the controller up, so continue
++		 * instead of deferring forever.
++		 */
++		if (PTR_ERR(host->device_reset) == -EPROBE_DEFER) {
++			dev_warn(dev, "reset gpio unavailable, continuing without\n");
++			host->device_reset = NULL;
++		} else {
++			err = dev_err_probe(dev, PTR_ERR(host->device_reset),
++					    "Failed to acquire device reset gpio\n");
++			goto out_variant_clear;
++		}
+ 	}
+ 
++	pr_info("UFSDBG: mmio revision read begin\n");
+ 	ufs_qcom_get_controller_revision(hba, &host->hw_ver.major,
+ 		&host->hw_ver.minor, &host->hw_ver.step);
+ 
+@@ -1629,10 +1652,13 @@ static int ufs_qcom_init(struct ufs_hba *hba)
+ 		goto out_variant_clear;
+ 
+ 	ufs_qcom_set_caps(hba);
++	pr_info("UFSDBG: quirks start\n");
+ 	ufs_qcom_advertise_quirks(hba);
++	pr_info("UFSDBG: host params start\n");
+ 	ufs_qcom_set_host_params(hba);
+ 	ufs_qcom_set_phy_gear(host);
+ 	ufs_qcom_parse_gear_limits(hba);
++	pr_info("UFSDBG: variant init done\n");
+ 
+ 	err = ufs_qcom_ice_init(host);
+ 	if (err)
+@@ -1680,6 +1706,7 @@ static int ufs_qcom_fw_managed_init(struct ufs_hba *hba)
+ 	host->hba = hba;
+ 	ufshcd_set_variant(hba, host);
+ 
++	pr_info("UFSDBG: mmio revision read begin\n");
+ 	ufs_qcom_get_controller_revision(hba, &host->hw_ver.major,
+ 					 &host->hw_ver.minor, &host->hw_ver.step);
+ 
+@@ -1687,11 +1714,8 @@ static int ufs_qcom_fw_managed_init(struct ufs_hba *hba)
+ 	if (err)
+ 		goto out_variant_clear;
+ 
+-	ufs_qcom_get_default_testbus_cfg(host);
+-	err = ufs_qcom_testbus_config(host);
+-	if (err)
+-		/* Failure is non-fatal */
+-		dev_warn(dev, "Failed to configure the testbus %d\n", err);
++	pr_info("UFSDBG: after ice, skipping testbus\n");
++	/* testbus is debug-only and stalls the bus before clocks are up */
+ 
+ 	hba->caps |= UFSHCD_CAP_WB_EN;
+ 
