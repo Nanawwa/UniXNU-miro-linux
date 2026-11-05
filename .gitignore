@@ -1,0 +1,11 @@
+out/
+linux-piano/
+debian-piano/
+*.img
+*.cpio.gz
+*.dtb
+*.bin
+*ed25519*
+netconsole.log
+auto.log
+rescue.log
