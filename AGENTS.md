@@ -23,7 +23,7 @@
 
 ## 不变量
 
-- oops 分区布局（parse-oops.py 与 UniXNU-miro 的 `zzzzzzz-miro-ufs-log.patch` 是一对，两边同步改）：16 MiB = 3968 块 OOPSLOG1 环（248 槽 × 64 KiB）+ 尾部探针 1 块 + panic 记录 8 块（MIROPNC1）。
+- oops 分区布局（parse-oops.py 与 UniXNU-miro 的 `zzzzzzz-miro-ufs-log.patch` 是一对，两边同步改）：16 MiB = 3968 块 OOPSLOG1 环（248 槽 × 64 KiB）+ 尾部探针 1 块 + panic 记录 8 块（DADAPNC1（沿用历史命名））。
 - 设备 IP `10.42.0.2`，主机 `10.42.0.1/24`；netconsole 走 UDP 6666（mini 的 nftables 需放行 USB 子网）。
 - 分区定位永远按 `PARTNAME=` 扫 `/sys/class/block/*/uevent`，不要硬编码 sdX。
 

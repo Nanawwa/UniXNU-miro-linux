@@ -303,7 +303,7 @@ fastboot --set-active=a
 `oops` 里 27 轮、5968 行 / 480 KB：
 
 ```
-(改名前的日志原样引用，magic 现为 MIROPNC1 / 前缀 miro-) dada crash: launchd pid 6
+(改名前的日志原样引用，magic 现为 DADAPNC1 / 前缀 miro-) dada crash: launchd pid 6
 wait_status 0x1: signalled signal 1 exit -1     ← SIGHUP
 csflags 0x22002301 killed 0
 panic-on-crash disabled via boot-arg
