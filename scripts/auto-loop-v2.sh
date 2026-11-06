@@ -96,13 +96,11 @@ for round in $(seq 1 "$ROUNDS"); do
     $SSH "dd if=/dev/$dev of=/run/o.bin bs=1M count=16 status=none" 2>/dev/null
     $SSH "cat /run/o.bin" > "$dest" 2>/dev/null
     log "oops dump: $(wc -c < "$dest") bytes"
-    python3 /root/k80pro-port/UniXNU-miro-linux/scripts/parse-mirolog.py "$dest" \
-        > "$OUT/r$round-report.txt" 2>&1
+    python3 /root/k80pro-port/UniXNU-miro-linux/scripts/parse-mirolog.py "$dest"         > "$OUT/r$round-report.txt" 2>&1
     sed -n '/panic text/,$p' "$OUT/r$round-report.txt" | head -6 | tee -a "$LOG"
   else
     log "oops partition not found (reader UFS did not enumerate)"
   fi
-  # reboot -f drops the device instantly; ssh would otherwise hang forever.
   timeout 6 $SSH -o ServerAliveInterval=1 -o ServerAliveCountMax=2 "reboot -f" 2>/dev/null || true
   sleep 8
 done
