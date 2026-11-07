@@ -68,8 +68,8 @@ for round in $(seq 1 "$ROUNDS"); do
     log "device never left fastboot; skipping"
     continue
   fi
-  log "device left fastboot; waiting for the PSCI reset (up to 320 s)"
-  if wait_fastboot 40; then
+  log "device left fastboot; waiting for the PSCI reset (up to 480 s)"
+  if wait_fastboot 60; then
     log "phone returned to fastboot on its own"
   else
     log "no auto-return within 320 s; skipping reader this round"
